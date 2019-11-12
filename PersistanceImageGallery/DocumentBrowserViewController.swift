@@ -15,10 +15,25 @@ class DocumentBrowserViewController: UIDocumentBrowserViewController, UIDocument
         super.viewDidLoad()
         
         delegate = self
-        
-        allowsDocumentCreation = true
         allowsPickingMultipleItems = false
+        allowsDocumentCreation = true
         
+        // putting blank template to applicationSupport filder
+        // to make it be "behind the scene"
+        // create the local URL first
+        
+        if UIDevice.current.userInterfaceIdiom == .pad { // allowing create new document only on iPad
+            template = try? FileManager.default.url(
+                for: .applicationSupportDirectory,
+                in: .userDomainMask,
+                appropriateFor: nil,
+                create: true
+                ).appendingPathComponent("Untitled.json")
+            // create document on specified template URL
+            if template != nil {
+                allowsDocumentCreation = FileManager.default.createFile(atPath: template!.path, contents: Data())
+            }
+        }
         // Update the style of the UIDocumentBrowserViewController
         // browserUserInterfaceStyle = .dark
         // view.tintColor = .white
@@ -26,21 +41,16 @@ class DocumentBrowserViewController: UIDocumentBrowserViewController, UIDocument
         // Specify the allowed content types of your application via the Info.plist.
         
         // Do any additional setup after loading the view.
+        
+        
     }
     
+    var template: URL?
     
     // MARK: UIDocumentBrowserViewControllerDelegate
     
     func documentBrowser(_ controller: UIDocumentBrowserViewController, didRequestDocumentCreationWithHandler importHandler: @escaping (URL?, UIDocumentBrowserViewController.ImportMode) -> Void) {
-        let newDocumentURL: URL? = nil
-        
-        // Set the URL for the new document here. Optionally, you can present a template chooser before calling the importHandler.
-        // Make sure the importHandler is always called, even if the user cancels the creation request.
-        if newDocumentURL != nil {
-            importHandler(newDocumentURL, .move)
-        } else {
-            importHandler(nil, .none)
-        }
+        importHandler(template, .copy)
     }
     
     func documentBrowser(_ controller: UIDocumentBrowserViewController, didPickDocumentsAt documentURLs: [URL]) {
@@ -62,13 +72,16 @@ class DocumentBrowserViewController: UIDocumentBrowserViewController, UIDocument
     
     // MARK: Document Presentation
     
-    func presentDocument(at documentURL: URL) {
-        
+    func presentDocument(at documentURL: URL)
+    {
         let storyBoard = UIStoryboard(name: "Main", bundle: nil)
-        let documentViewController = storyBoard.instantiateViewController(withIdentifier: "DocumentViewController") as! DocumentViewController
-        documentViewController.document = Document(fileURL: documentURL)
-        
-        present(documentViewController, animated: true, completion: nil)
+        let documentVC = storyBoard.instantiateViewController(withIdentifier: "DocumentMVC")
+        // .contents is an extension that is stored in Utilities file
+        // connecting to Navigation Controller
+        if let imageGalleryCollectionViewController = documentVC.contents as? ImageGalleryCollectionViewController {
+            imageGalleryCollectionViewController.document = ImageGalleryDocument(fileURL: documentURL)
+        }
+        present(documentVC, animated:  true)
     }
 }
 
