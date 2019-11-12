@@ -15,6 +15,8 @@ class ImageGalleryCollectionViewController: UICollectionViewController, UIDropIn
     
     var imageGallery = ImageGallery()
     
+    // MARK: - Document Management
+    
     var document: ImageGalleryDocument?
     
     @IBAction func save(_ sender: UIBarButtonItem? = nil) {
@@ -91,6 +93,20 @@ class ImageGalleryCollectionViewController: UICollectionViewController, UIDropIn
 //            document = ImageGalleryDocument(fileURL: url)
 //        }
 //    }
+    
+    // MARK: - Caching
+    
+    private var cache = URLCache.shared // recommended to us this by Apple
+    private var session = URLSession(configuration: .default)
+    
+    override func viewDidLoad() {
+        super.viewDidLoad()
+        // but for assignment we can do this
+        cache = URLCache(memoryCapacity: 5*1024*1024, diskCapacity: 30*1024*1024, diskPath: nil) // replace capacities with your own values
+    }
+    
+    
+    
     // MARK: - Navigation
 
     // In a storyboard-based application, you will often want to do a little preparation before navigation
@@ -277,7 +293,7 @@ class ImageGalleryCollectionViewController: UICollectionViewController, UIDropIn
                 // Get the url
                 item.dragItem.itemProvider.loadObject(ofClass: NSURL.self) { (provider, error) in
                     DispatchQueue.main.async {
-                        if let url = provider {
+                        if let url = provider, ratio != nil {
                             placeholderContext.commitInsertion(dataSourceUpdates: { insertionIndexPath in
                                 self.imageGallery.items.insert(ImageGallery.ImageGalleryInfo(imageURL: url as! URL, ratio: ratio!), at: insertionIndexPath.item)
                             })
@@ -300,8 +316,38 @@ class ImageGalleryCollectionViewController: UICollectionViewController, UIDropIn
         let cell = collectionView.dequeueReusableCell(withReuseIdentifier: reuseIdentifier, for: indexPath)
         
         if let imageCell = cell as? ImageGalleryCollectionViewCell {
+            
+            imageCell.imageURL = nil
+            imageCell.imageIcon.isHidden = true
+            
             let url = imageGallery.items[indexPath.item]
-            imageCell.imageURL = url.imageURL
+            
+            let request = URLRequest(url: url.imageURL) // imageURL from Utilities.swift of Stanford iOS course
+            if let cachedResponse = cache.cachedResponse(for: request), let image = UIImage(data: cachedResponse.data) {
+                imageCell.imageURL = url.imageURL
+                imageCell.imageIcon.isHidden = false
+            } else {
+                DispatchQueue.global(qos: .userInitiated).async { [weak self, weak imageCell] in
+                    let task = self?.session.dataTask(with: request) { (urlData, urlResponse, urlError) in
+                        DispatchQueue.main.async {
+                            if urlError != nil { print("Data request failed with error \(urlError!)") }
+                            if let data = urlData, let image = UIImage(data: data) {
+                                if let response = urlResponse {
+                                    self?.cache.storeCachedResponse(CachedURLResponse(response: response, data: data), for: request)
+                                }
+                                imageCell?.imageURL = url.imageURL
+                            } else {
+                                imageCell?.imageIcon.image = UIImage(named: "placeholder")
+                            }
+                            imageCell?.imageIcon.isHidden = false
+                        }
+                    }
+                    task?.resume()
+                }
+            }
+            
+            
+            
         }
         
         return cell
