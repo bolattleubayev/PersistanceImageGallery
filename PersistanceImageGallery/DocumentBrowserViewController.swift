@@ -28,7 +28,7 @@ class DocumentBrowserViewController: UIDocumentBrowserViewController, UIDocument
                 in: .userDomainMask,
                 appropriateFor: nil,
                 create: true
-                ).appendingPathComponent("Untitled.json")
+                ).appendingPathComponent("Untitled.imagegallery")
             // create document on specified template URL
             if template != nil {
                 allowsDocumentCreation = FileManager.default.createFile(atPath: template!.path, contents: Data())
